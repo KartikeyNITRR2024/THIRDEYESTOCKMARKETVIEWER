@@ -133,7 +133,8 @@ public class StocksPriceChangesCalculator {
                     marketThresold.getUserId(), 
                     gapIs, 
                     marketThresold.getThresoldType(),
-                    (liveStockPayload.getTime().getTime() - pojoToCheckFor.getTime().getTime()) / 1000
+                    (liveStockPayload.getTime().getTime() - pojoToCheckFor.getTime().getTime()) / 1000,
+                    pojoToCheckFor.getPrice(), liveStockPayload.getPrice()
                 );
                 liveStockPayload.getProfitDetailsList().add(profitDetail);
             }
