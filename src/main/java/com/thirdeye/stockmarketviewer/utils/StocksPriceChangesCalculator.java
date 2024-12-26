@@ -8,6 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,9 @@ public class StocksPriceChangesCalculator {
 	
 	@Autowired
 	Thirdeye_Messenger_Connection thirdeye_Messenger_Connection;
+	
+    @Value("${limitInTimeSeconds}")
+    private Integer limitInTimeSeconds;
 	
     public PriceTimestampPojo findNearestTimestamp(List<PriceTimestampPojo> pastData, Timestamp searchTime) {
 //		logger.info("In function findNearestTimestamp");
@@ -123,8 +127,18 @@ public class StocksPriceChangesCalculator {
             if (marketThresold.getThresoldType() == 0) {
                 gapIs = (gapIs / pojoToCheckFor.getPrice()) * 100;
             }
+            
+            boolean timeLimit = false;
+            Long upperLimit = marketThresold.getThresoldTime() + limitInTimeSeconds;
+            Long lowerLimit = marketThresold.getThresoldTime() - limitInTimeSeconds;
+            Long currentTimeGap = (liveStockPayload.getTime().getTime() - pojoToCheckFor.getTime().getTime()) / 1000;
+            
+            if(currentTimeGap<=upperLimit && currentTimeGap>=lowerLimit)
+            {
+            	timeLimit = true;
+            }
 
-            if (gapIs >= marketThresold.getThresoldPrice()) {
+            if (gapIs >= marketThresold.getThresoldPrice() && timeLimit) {
                 if (liveStockPayload.getProfitDetailsList() == null) {
                     liveStockPayload.setProfitDetailsList(new ArrayList<>());
                 }
@@ -133,7 +147,7 @@ public class StocksPriceChangesCalculator {
                     marketThresold.getUserId(), 
                     gapIs, 
                     marketThresold.getThresoldType(),
-                    (liveStockPayload.getTime().getTime() - pojoToCheckFor.getTime().getTime()) / 1000,
+                    currentTimeGap,
                     pojoToCheckFor.getPrice(), liveStockPayload.getPrice()
                 );
                 liveStockPayload.getProfitDetailsList().add(profitDetail);
