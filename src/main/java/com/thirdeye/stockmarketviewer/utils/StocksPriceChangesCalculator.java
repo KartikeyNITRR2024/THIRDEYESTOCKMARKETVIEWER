@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 
 import com.thirdeye.stockmarketviewer.entity.MarketThresold;
 import com.thirdeye.stockmarketviewer.externalcontrollers.Thirdeye_Messenger_Connection;
+import com.thirdeye.stockmarketviewer.externalcontrollers.Thirdeye_Processer;
 import com.thirdeye.stockmarketviewer.pojos.LiveStockPayload;
+import com.thirdeye.stockmarketviewer.pojos.LiveStockProcesserPayload;
 import com.thirdeye.stockmarketviewer.pojos.PriceTimestampPojo;
 import com.thirdeye.stockmarketviewer.pojos.ProfitDetails;
 import com.thirdeye.stockmarketviewer.services.impl.MarketThresoldServiceImpl;
@@ -28,10 +30,16 @@ public class StocksPriceChangesCalculator {
 	MarketThresoldServiceImpl marketThresoldImpl;
 	
 	@Autowired
+	PropertyLoader propertyLoader;
+	
+	@Autowired
 	Thirdeye_Messenger_Connection thirdeye_Messenger_Connection;
 	
-    @Value("${limitInTimeSeconds}")
-    private Integer limitInTimeSeconds;
+	@Autowired
+	Thirdeye_Processer thirdeye_Processer;
+	
+//    @Value("${limitInTimeSeconds}")
+//    private Integer limitInTimeSeconds;
 	
     public PriceTimestampPojo findNearestTimestamp(List<PriceTimestampPojo> pastData, Timestamp searchTime) {
 //		logger.info("In function findNearestTimestamp");
@@ -109,6 +117,7 @@ public class StocksPriceChangesCalculator {
     
     @Async("LiveStockAsynchThread")
     public CompletableFuture<Void> calculateChanges(LiveStockPayload liveStockPayload, List<PriceTimestampPojo> pastData) {
+        Long limitInTimeSeconds = propertyLoader.timeGap / 2;
         if (pastData == null) {
             logger.info("Returning because past data is null");
             return CompletableFuture.completedFuture(null);
@@ -151,6 +160,19 @@ public class StocksPriceChangesCalculator {
                     pojoToCheckFor.getPrice(), liveStockPayload.getPrice()
                 );
                 liveStockPayload.getProfitDetailsList().add(profitDetail);
+                
+                if(marketThresold.getId() == 1L)
+                {
+                    logger.info("Calling Processer Services");
+                	LiveStockProcesserPayload liveStockProcesserPayload = new LiveStockProcesserPayload();
+                	liveStockProcesserPayload.setStockId(liveStockPayload.getStockId().intValue());
+                	liveStockProcesserPayload.setOldPrice(pojoToCheckFor.getPrice());
+                	liveStockProcesserPayload.setNewPrice(liveStockPayload.getPrice());
+                	liveStockProcesserPayload.setPercentIncrease(gapIs);
+                	liveStockProcesserPayload.setTime(liveStockPayload.getTime());
+                	liveStockProcesserPayload.setTimeDifference(currentTimeGap.doubleValue());
+                	thirdeye_Processer.sendLiveStockProcesserPayload(liveStockProcesserPayload);
+                }
             }
         }
 
